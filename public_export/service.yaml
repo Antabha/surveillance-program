@@ -1,0 +1,23 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: captions-service
+  annotations:
+    run.googleapis.com/ingress: "all"
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/execution-environment: "gen2"
+    spec:
+      serviceAccountName: stt-streamer@{{YOUR_PROJECT_ID}}.iam.gserviceaccount.com
+      containers:
+      - image: us-central1-docker.pkg.dev/{{YOUR_PROJECT_ID}}/captions-repo/app:latest
+        ports:
+        - containerPort: 8080
+          name: h2c
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"

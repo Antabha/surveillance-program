@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+websockets
+google-cloud-speech
+python-dotenv
+grpcio

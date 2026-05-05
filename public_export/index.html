@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="/manifest.json">
+    <title>Live Match Captions</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --box-bg: #111111;
+            --text-final: #ffffff;
+            --text-interim: #a0a0a0;
+            --accent: #00ffaa;
+            --accent-hover: #00cc88;
+            --danger: #ff4444;
+            --danger-hover: #cc0000;
+            --secondary: #333333;
+            --secondary-hover: #444444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-final);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: var(--accent);
+            margin-bottom: 20px;
+            font-size: clamp(24px, 5vw, 36px);
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 600px;
+            justify-content: center;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            max-width: 250px;
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            color: #000;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--accent-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary);
+            color: #fff;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: var(--secondary-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: #fff;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background-color: var(--danger-hover);
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .caption-box {
+            width: 100%;
+            max-width: 800px;
+            background-color: var(--box-bg);
+            border: 2px solid #333;
+            border-radius: 12px;
+            padding: 25px;
+            min-height: 40vh;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .status {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            background-color: #666;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            transition: background-color 0.3s;
+        }
+
+        .status-dot.active {
+            background-color: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        .transcript-area {
+            flex-grow: 1;
+            font-size: clamp(20px, 4vw, 32px);
+            line-height: 1.6;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .interim {
+            color: var(--text-interim);
+        }
+
+        .final {
+            color: var(--text-final);
+            font-weight: 500;
+        }
+
+        /* Hide elements by default */
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 15px; }
+            .caption-box { padding: 15px; min-height: 50vh; }
+            button { padding: 12px 10px; font-size: 14px; }
+            .controls { flex-direction: column; align-items: center; }
+            button { width: 100%; max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Live Match Captions</h1>
+
+    <!-- Role Selection -->
+    <div id="roleSelection" class="controls">
+        <button id="broadcasterBtn" class="btn-primary">Join as Broadcaster</button>
+        <button id="viewerBtn" class="btn-secondary">Join as Viewer</button>
+    </div>
+
+    <!-- Broadcaster Active Controls -->
+    <div id="broadcasterControls" class="controls hidden">
+        <button id="stopBtn" class="btn-danger">Stop Broadcasting</button>
+    </div>
+
+    <!-- Main Caption Area -->
+    <div id="captionContainer" class="caption-box hidden">
+        <div class="status">
+            <span id="micStatusContainer" class="hidden">
+                <span class="status-dot" id="micStatus"></span> Microphone
+            </span>
+            <span>
+                <span class="status-dot" id="serverStatus"></span> Server Connection
+            </span>
+        </div>
+        <div class="transcript-area" id="transcriptArea">
+            <span id="finalText" class="final"></span>
+            <span id="interimText" class="interim"></span>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const roleSelection = document.getElementById('roleSelection');
+        const broadcasterControls = document.getElementById('broadcasterControls');
+        const captionContainer = document.getElementById('captionContainer');
+        const micStatusContainer = document.getElementById('micStatusContainer');
+        
+        const broadcasterBtn = document.getElementById('broadcasterBtn');
+        const viewerBtn = document.getElementById('viewerBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        
+        const finalTextSpan = document.getElementById('finalText');
+        const interimTextSpan = document.getElementById('interimText');
+        const transcriptArea = document.getElementById('transcriptArea');
+        const micStatusDot = document.getElementById('micStatus');
+        const serverStatusDot = document.getElementById('serverStatus');
+
+        // State
+        let audioContext;
+        let scriptProcessor;
+        let mediaStream;
+        let audioSocket;
+        let captionSocket;
+
+        function getWebSocketUrl(endpoint) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            return `${protocol}//${window.location.host}${endpoint}`;
+        }
+
+        // --- VIEWER & LOOPBACK RECEIVER ---
+        function connectCaptionReceiver() {
+            captionSocket = new WebSocket(getWebSocketUrl('/caption-receiver'));
+
+            captionSocket.onopen = () => {
+                serverStatusDot.classList.add('active');
+                console.log("Caption receiver connected");
+            };
+
+            captionSocket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.is_final) {
+                        finalTextSpan.textContent += (finalTextSpan.textContent ? " " : "") + data.transcript;
+                        interimTextSpan.textContent = "";
+                        // Auto-scroll to bottom
+                        transcriptArea.scrollTop = transcriptArea.scrollHeight;
+                    } else {
+                        interimTextSpan.textContent = " " + data.transcript;
+                    }
+                } catch (e) {
+                    console.error("Failed to parse JSON caption:", e);
+                }
+            };
+
+            captionSocket.onclose = () => {
+                serverStatusDot.classList.remove('active');
+                console.log("Caption receiver disconnected, reconnecting...");
+                setTimeout(connectCaptionReceiver, 3000);
+            };
+        }
+
+        // --- BROADCASTER STREAMING ---
+        async function startStreaming() {
+            try {
+                // Request microphone access
+                mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    } 
+                });
+                
+                // Initialize AudioContext ONLY AFTER user gesture (button click)
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                // Downsample to 16kHz Mono
+                audioContext = new AudioContext({ sampleRate: 16000 });
+                
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                // Connect to Stream Audio WebSocket
+                audioSocket = new WebSocket(getWebSocketUrl('/stream-audio'));
+
+                audioSocket.onopen = () => {
+                    micStatusDot.classList.add('active');
+                    
+                    const source = audioContext.createMediaStreamSource(mediaStream);
+                    
+                    // Use ScriptProcessorNode to process audio chunks
+                    // 4096 buffer size = ~256ms of audio at 16kHz
+                    scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+                    scriptProcessor.onaudioprocess = (e) => {
+                        if (audioSocket.readyState === WebSocket.OPEN) {
+                            const float32Array = e.inputBuffer.getChannelData(0);
+                            
+                            // Convert Float32 to 16-bit PCM (Int16Array)
+                            const int16Array = new Int16Array(float32Array.length);
+                            for (let i = 0; i < float32Array.length; i++) {
+                                let s = Math.max(-1, Math.min(1, float32Array[i]));
+                                int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                            }
+                            
+                            // Send over WebSocket
+                            audioSocket.send(int16Array.buffer);
+                        }
+                    };
+
+                    source.connect(scriptProcessor);
+                    scriptProcessor.connect(audioContext.destination);
+                };
+
+                audioSocket.onclose = () => {
+                    stopStreaming();
+                };
+
+            } catch (err) {
+                console.error("Microphone error:", err);
+                alert("Please allow microphone access to stream audio.");
+                resetUI();
+            }
+        }
+
+        function stopStreaming() {
+            micStatusDot.classList.remove('active');
+            
+            if (audioSocket && audioSocket.readyState === WebSocket.OPEN) {
+                audioSocket.close();
+            }
+            if (scriptProcessor) scriptProcessor.disconnect();
+            if (audioContext) audioContext.close();
+            if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
+
+            resetUI();
+        }
+
+        function resetUI() {
+            roleSelection.classList.remove('hidden');
+            broadcasterControls.classList.add('hidden');
+            captionContainer.classList.add('hidden');
+            micStatusContainer.classList.add('hidden');
+        }
+
+        // --- EVENT LISTENERS ---
+        viewerBtn.addEventListener('click', () => {
+            roleSelection.classList.add('hidden');
+            captionContainer.classList.remove('hidden');
+            
+            // Viewers only connect to the caption receiver
+            connectCaptionReceiver();
+        });
+
+        broadcasterBtn.addEventListener('click', () => {
+            roleSelection.classList.add('hidden');
+            broadcasterControls.classList.remove('hidden');
+            captionContainer.classList.remove('hidden');
+            micStatusContainer.classList.remove('hidden');
+            
+            // Broadcasters connect to BOTH stream and receive (loopback)
+            connectCaptionReceiver();
+            startStreaming();
+        });
+
+        stopBtn.addEventListener('click', stopStreaming);
+
+    </script>
+</body>
+</html>

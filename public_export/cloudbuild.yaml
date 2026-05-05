@@ -1,0 +1,43 @@
+steps:
+  # Debugging step: List all files in the workspace so we can see what GitHub actually provided
+  - name: 'ubuntu'
+    args: ['bash', '-c', 'echo "--- DIRECTORY STRUCTURE ---" && ls -laR && echo "------------------------"']
+
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'asia-south1-docker.pkg.dev/{{YOUR_PROJECT_ID}}/captions-repo/app:latest', '-f', 'Dockerfile', '.']
+
+  # Push the container image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'asia-south1-docker.pkg.dev/{{YOUR_PROJECT_ID}}/captions-repo/app:latest']
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'captions-service'
+      - '--image'
+      - 'asia-south1-docker.pkg.dev/{{YOUR_PROJECT_ID}}/captions-repo/app:latest'
+      - '--region'
+      - 'asia-south1'
+      - '--port'
+      - '8080'
+      - '--no-use-http2'
+      - '--ingress'
+      - 'all'
+      - '--service-account'
+      - 'stt-streamer@{{YOUR_PROJECT_ID}}.iam.gserviceaccount.com'
+      - '--allow-unauthenticated'
+
+  # Auto-Deploy to Firebase Hosting
+  - name: 'node:20-slim'
+    entrypoint: 'npx'
+    args: ['firebase-tools', 'deploy', '--only', 'hosting', '--project', '{{YOUR_PROJECT_ID}}', '--non-interactive']
+
+images:
+  - 'asia-south1-docker.pkg.dev/{{YOUR_PROJECT_ID}}/captions-repo/app:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
